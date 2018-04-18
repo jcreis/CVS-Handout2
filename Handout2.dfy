@@ -5,18 +5,25 @@ class Row {
     constructor()
     {   
         this.name := new char[0];
-        this.age := age;
-    
+        this.age := 0;
     }
 
     method setName(nome: array<char>)
     modifies this
+
+    requires nome.Length > 0
+
+    ensures this.name.Length > 0
     {
         this.name := nome;
     }
 
     method setAge(idade: int) 
     modifies this
+
+    requires idade >= 0;
+
+    ensures this.age >= 0;
     {
         this.age := idade;
     }
@@ -39,8 +46,10 @@ class PersonDB {
         this.size := 0;
     }
 
-    method add() returns (size:int)
+    method add() returns (index:int)
         modifies this.db, this`size
+
+        requires this.db.Length > size
     {
         if( 0 <= size < db.Length ) {
             db[size] := new Row();
@@ -49,11 +58,12 @@ class PersonDB {
     }
 
     method delete(i:int) 
-        modifies this.db, this`size
+        modifies this.db //, this`size
         
     {
         if( 0 <= i < db.Length ) {
             db[i] := new Row();
+            //size := size - 1;
         }
     }
 
@@ -68,17 +78,22 @@ class PersonDB {
     } */
 
     method find(id: int) returns (p: Person?)
+    requires 0 <= id < db.Length
+    requires 0 <= id < size
     {
-
+        p := null;
+        if(db[id] != null){
+            if(db[id].name.Length > 0 && db[id].age >= 0){
+               p := new Person();
+               p.setAge(db[id].age);
+               p.setName(db[id].name);
+               p.setConnection(this);
+           }
+       }
+       return p;
     }
 
 }
-
-
-
-
-
-
 
 
 
@@ -99,26 +114,28 @@ class Person {
 
 
     method save(p: PersonDB?)
-    modifies this`id
+    modifies this`id, this`connection
 
     requires Transient()
-    requires p != null ==> this.connection != null
-
+    requires p != null
+    requires p.db.Length > 0
     requires this.id == -1
     requires this.name.Length > 0 && this.age >= 0
     requires p.db.Length > p.size
 
     ensures Persitent()
+    ensures p != null ==> this.connection != null
     ensures this.name.Length > 0
     ensures this.age >= 0
     {
         this.setConnection(p);
         var pplDB := this.connection.db;
         var pos := this.id;
-        
         if(this.id < 0){
             pos := connection.add();
         }
+       
+
         pplDB[pos].setName(this.name);
         pplDB[pos].setAge(this.age);
 
