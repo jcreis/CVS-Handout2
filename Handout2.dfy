@@ -1,3 +1,61 @@
+// HANDOUT 2 || JOAO REIS -> 43914
+
+class PersonDB {
+    var db:array<Row?>;
+    var size:int;
+
+    constructor() 
+        ensures fresh(db)
+    {
+        this.db := new Row?[10];
+        this.size := 0;
+    }
+
+    method add() returns (index:int)
+        modifies this.db, this`size
+
+        requires this.db != null
+        requires 0 <= size < this.db.Length
+        
+        ensures 0 <= index < size
+    {
+        index := 0;
+        if( 0 <= size < db.Length ) {
+            index := size;
+            db[size] := new Row();
+            size := size + 1;
+        }
+    }
+
+    method delete(i:int) 
+        modifies this.db, this`size
+        
+        requires this.db != null
+    {
+        if( 0 <= i < db.Length ) {
+            db[i] := null;
+            size := size - 1;
+        }
+    }
+
+    method find(id: int) returns (p: Person?)
+    requires this.db != null
+    requires 0 <= size < this.db.Length
+    requires 0 <= id <= size
+    {
+        p := null;
+        if(db[id].name.Length > 0 && db[id].age >= 0){
+            p := new Person();
+            p.setAge(db[id].age);
+            p.setName(db[id].name);
+            p.setConnection(this);
+        }
+       
+       return p;
+    }
+
+}
+
 class Row {
 
     var name: array<char>;
@@ -30,73 +88,6 @@ class Row {
    
 }
 
-
-
-
-
-
-class PersonDB {
-    var db:array<Row>;
-    var size:int;
-
-    constructor() 
-        ensures fresh(db)
-    {
-        this.db := new Row?[10];
-        this.size := 0;
-    }
-
-    method add() returns (index:int)
-        modifies this.db, this`size
-
-        requires this.db.Length > size
-    {
-        if( 0 <= size < db.Length ) {
-            db[size] := new Row();
-            size := size + 1;
-        }
-    }
-
-    method delete(i:int) 
-        modifies this.db //, this`size
-        
-    {
-        if( 0 <= i < db.Length ) {
-            db[i] := new Row();
-            //size := size - 1;
-        }
-    }
-
-   /*  method save(name: string, age: int) returns (id:int)
-    {
-
-    } */
-
-    /* method update(name: string, age: int, id: int)
-    {
-
-    } */
-
-    method find(id: int) returns (p: Person?)
-    requires 0 <= id < db.Length
-    requires 0 <= id < size
-    {
-        p := null;
-        if(db[id] != null){
-            if(db[id].name.Length > 0 && db[id].age >= 0){
-               p := new Person();
-               p.setAge(db[id].age);
-               p.setName(db[id].name);
-               p.setConnection(this);
-           }
-       }
-       return p;
-    }
-
-}
-
-
-
 class Person {
     var name: array<char>;
     var age: int;
@@ -117,14 +108,15 @@ class Person {
     modifies this`id, this`connection
 
     requires Transient()
+    requires this.connection == null
     requires p != null
-    requires p.db.Length > 0
     requires this.id == -1
     requires this.name.Length > 0 && this.age >= 0
     requires p.db.Length > p.size
-
+    
     ensures Persitent()
     ensures p != null ==> this.connection != null
+    ensures this.id > -1
     ensures this.name.Length > 0
     ensures this.age >= 0
     {
@@ -132,18 +124,14 @@ class Person {
         var pplDB := this.connection.db;
         var pos := this.id;
         if(this.id < 0){
-            pos := connection.add();
+            pos := this.connection.add();
         }
        
-
         pplDB[pos].setName(this.name);
         pplDB[pos].setAge(this.age);
 
         this.setID(pos);
     }
-
-
-
 
     method close()
     modifies this`connection
@@ -160,10 +148,7 @@ class Person {
         this.setConnection(null);
     }
 
-
-
-
-    method update(p: PersonDB)
+    method update(p: PersonDB?)
     modifies this`connection
 
     requires Detached()
@@ -177,30 +162,29 @@ class Person {
     ensures this.connection != null
     {
         this.setConnection(p);
+        var pos := this.id;
+        if(this.id > -1){
+            pos := connection.add();
+        }
     }
 
-
-
-
-
     method delete()
-    modifies this`id
+    modifies this`id, this`connection
 
     requires Persitent()
     requires this.id > -1
-    requires connection != null
+    requires this.connection != null
     requires this.name.Length > 0 && this.age >= 0
 
     ensures Transient()
     ensures this.id == -1
-    {
+    ensures this.connection == null
+    { 
         this.setID(-1);
+        this.setConnection(null);
     }
 
-
-
-
-
+// - - - - - - - - - SETTERS - - - - - - - - - - 
 
     method setName(nome: array<char>)
     modifies this`name
@@ -226,19 +210,19 @@ class Person {
         this.connection:= connect;
     }
 
-
+// - - - - - - - - - STATES - - - - - - - - - - 
 
     function Transient():bool
- 	reads this
+ 	reads this    
  	{ 
-         if(id == -1) then true
+         if(this.id == -1) then true
          else false
     }
  	
  	function Persitent():bool
  	reads this
  	{   
-         if(id > -1 && connection != null) then true
+         if(this.id > -1 && this.connection != null) then true
          else false
     } 
 
@@ -246,11 +230,9 @@ class Person {
  	reads this
     
  	{ 
-         if(id > -1 && connection == null) then true
+         if(this.id > -1 && this.connection == null) then true
          else false
     } 
-
-
 
 }
 
